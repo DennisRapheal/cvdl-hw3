@@ -41,10 +41,10 @@ sigma:平滑程度
 '''
 def get_train_transform() -> A.Compose:
     return A.Compose([
-        A.HorizontalFlip(p=0.3),
-        A.VerticalFlip(p=0.3),
+        # A.HorizontalFlip(p=0.3),
+        # A.VerticalFlip(p=0.3),
         A.ElasticTransform(alpha=30, sigma=12, p=0.3),
-        A.RandomRotate90(p=0.3),
+        # A.RandomRotate90(p=0.3),
         A.Normalize(mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
