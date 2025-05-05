@@ -100,11 +100,6 @@ class CellDataset(Dataset):
                 masks.append(inst_mask)
                 labels.append(cls)
 
-        # === 加載 center / boundary maps ===
-        map_folder = Path("./data/train_maps")
-        center_map = np.load(map_folder / f"{folder.name}_center_heat_map.npy")
-        boundary_map = np.load(map_folder / f"{folder.name}_boundary_map.npy")
-
         # --- 3. 若沒有任何物件，補上空 target（模型不會爆） ---
         if len(masks) == 0:
             masks = torch.zeros((0, H, W), dtype=torch.uint8)
@@ -133,9 +128,7 @@ class CellDataset(Dataset):
             "boxes": boxes,
             "labels": labels,
             "masks": masks,
-            "image_id": torch.tensor([idx]),
-            "center_map": torch.tensor(center_map, dtype=torch.float32),
-            "boundary_map": torch.tensor(boundary_map, dtype=torch.float32),
+            "image_id": torch.tensor([idx])
         }
 
 

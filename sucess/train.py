@@ -27,11 +27,9 @@ def get_args():
     p.add_argument('--model_name', type=str, default='unknonw')
     p.add_argument('--model_type', type=str, default='resnet50',
                    choices=['resnet50', 'resnet50_v2'])
-    p.add_argument('--pretrained_pth', type=str, default='')
     p.add_argument('--epochs', type=int, default=40)
     p.add_argument('--batch_size', type=int, default=4)
     p.add_argument('--lr', type=float, default=1e-4)
-    p.add_argument('--with_train_map', type=bool, default=False)
     p.add_argument('--data_root', type=str, default='data/train')
     p.add_argument('--save_dir', type=str, default='checkpoints')
     return p.parse_args()
@@ -42,7 +40,7 @@ def get_args():
 # Epoch loops
 # -------------------------
 
-def train_one_epoch(model, loader, optim, device, with_train_map=False):
+def train_one_epoch(model, loader, optim, device):
     model.train()
     metric = MeanAveragePrecision(iou_type="bbox")  # 先用 bbox mAP 作 proxy
 
@@ -53,8 +51,6 @@ def train_one_epoch(model, loader, optim, device, with_train_map=False):
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         loss_dict = model(images, targets)
-
-        # ➕ 如果模型輸出包含 center / boundary maps，額外加入 loss
 
         loss = sum(loss_dict.values())
         epoch_loss += loss.item()
@@ -120,9 +116,6 @@ if __name__ == '__main__':
 
     # Model
     model = get_model(num_classes=5, model_type=args.model_type)
-    if args.pretrained_pth != '':
-        model.load_state_dict(torch.load(args.pretrained_pth, map_location=device))
-
     model.to(device)
 
     # Optimiser & scheduler

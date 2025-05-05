@@ -16,6 +16,6 @@ python train.py --model_name v1_b2_elastic --model_type resnet50 --epochs 100 --
 python train.py --model_name v2_b2_elastic --model_type resnet50_v2 --epochs 100 --batch_size 2
 
 #alpha 30 sigma 12
-CUDA_VISIBLE_DEVICES=4 python train.py --model_name v2_b4_elastic --model_type resnet50_v2 --pretrained_pth ./checkpoints/v2_b4_elastic_bone.pth --epochs 100 --batch_size 4 --lr 3e-5
+CUDA_VISIBLE_DEVICES=1 python train.py --model_name v2_b4_elastic --model_type resnet50_v2 --epochs 150 --batch_size 4
 # python train.py --model_name resnet50_baseline --model_type resnet50 --epochs 100 --batch_size 4
 # python train.py --model_name resnet50_v2_nocrop --model_type resnet50_v2 --epochs 70 --batch_size 4

@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 from torchvision.models.detection import (
     maskrcnn_resnet50_fpn,
     maskrcnn_resnet50_fpn_v2,
@@ -9,21 +8,8 @@ from torchvision.models.detection import (
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn   import MaskRCNNPredictor
 
-class ExtraHead(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, name: str):
-        super().__init__()
-        self.head = nn.Sequential(
-            nn.Conv2d(in_channels, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(256, out_channels, kernel_size=1)
-        )
-        self.name = name  # debug or loss logging
 
-    def forward(self, x):
-        return self.head(x)
-
-
-def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bool = False):
+def get_model(num_classes: int, model_type: str = "resnet50"):
     """
     建立 Mask R‑CNN 模型並替換 heads 以符合自訂類別數。
 
@@ -58,11 +44,5 @@ def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bo
     model.roi_heads.mask_predictor = MaskRCNNPredictor(
         in_channels_mask, hidden_dim, num_classes
     )
-
-    if with_train_map:
-        # 假設我們使用的是 mask feature 的輸出通道
-        # 可以替換成其他 feature，如 model.backbone.out_channels
-        model.center_head = ExtraHead(in_channels_mask, 1, name="center")       # binary output
-        model.boundary_head = ExtraHead(in_channels_mask, 1, name="boundary")   # binary output
 
     return model
