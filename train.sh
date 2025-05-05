@@ -9,6 +9,10 @@
 #alpha 30 sigma 12 # no transform
 python train.py --model_name v1_b1 --model_type resnet50 --epochs 80 --batch_size 1
 
+#alpha 30 sigma 12 only elastic
+CUDA_VISIBLE_DEVICES=3 python train.py --model_name v1_b1_elastic --model_type resnet50 --epochs 50 --batch_size 1 && 
+python train.py --model_name v1_b4_elastic --model_type resnet50 --epochs 100 --batch_size 4
+
 #alpha 30 sigma 12 # elastic
 python train.py --model_name v1_b2_elastic --model_type resnet50 --epochs 100 --batch_size 2
 
