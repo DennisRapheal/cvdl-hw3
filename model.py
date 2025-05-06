@@ -9,60 +9,143 @@ from torchvision.models.detection import (
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn   import MaskRCNNPredictor
 
+# model_with_maps.py
+import torch
+from torch import nn
+import torch.nn.functional as F
+from torchvision.models.detection.mask_rcnn import MaskRCNN
+from torchvision.models.detection.image_list import ImageList
+
+# -- your ExtraHead stays exactly the same -------------------------------
 class ExtraHead(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, name: str):
         super().__init__()
+        self.name = name
         self.head = nn.Sequential(
-            nn.Conv2d(in_channels, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(256, out_channels, kernel_size=1)
+            nn.Conv2d(in_channels, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, out_channels, 1)
         )
-        self.name = name  # debug or loss logging
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.head(x)
 
 
-def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bool = False):
+# -----------------------------------------------------------------------
+class MaskRCNNWithMaps(MaskRCNN):
     """
-    建立 Mask R‑CNN 模型並替換 heads 以符合自訂類別數。
+    Wrapper that adds two auxiliary heads producing
+    * center heat‑map   (B,1,H,W)
+    * boundary heat‑map (B,1,H,W)
 
-    Args:
-        num_classes (int): 包含背景的總類別數 (背景 + N 物件)。
-        model_type  (str): 'resnet50' 或 'resnet50_v2'。
-
-    Returns:
-        torchvision.models.detection.MaskRCNN
+    Expect each sample’s `targets` dict (training‑time only) to contain
+        'center_map':   Tensor[1,H,W]  – binary mask (0/1)
+        'boundary_map': Tensor[1,H,W]  – binary mask (0/1)
     """
-    # 1. 載入指定 backbone 與預訓練權重
+    def __init__(self, base_model: MaskRCNN,
+                 loss_weight: float = 1.0,
+                 bce_pos_weight: float | None = None):
+        # steal everything from the already‑built base_model
+        super().__init__(base_model.backbone,
+                         base_model.rpn,
+                         base_model.roi_heads,
+                         base_model.transform)
+        # ----------------------------------------------------------------
+        in_ch = base_model.backbone.out_channels  # FPN: 256
+        self.center_head   = ExtraHead(in_ch, 1, "center")
+        self.boundary_head = ExtraHead(in_ch, 1, "boundary")
+
+        self._aux_w  = loss_weight
+        self._pos_w  = None
+        if bce_pos_weight is not None:
+            self._pos_w = torch.tensor([bce_pos_weight])
+
+    # --------------------------------------------------------------------
+    def forward(self, images, targets=None):
+        """
+        * training  →  losses dict  (main + auxiliary)
+        * eval      →  predictions list, each with extra
+                       'center_logits' and 'boundary_logits'
+        """
+        if self.training:
+            assert targets is not None, "targets required in train mode"
+
+        # 1) standard pre‑processing (normalisation + batching)
+        images, targets = self.transform(images, targets)
+        # images -> ImageList  (tensors, image_sizes)
+
+        # 2) backbone
+        features = self.backbone(images.tensors)
+        if isinstance(features, torch.Tensor):
+            features = {"0": features}
+
+        # ----------------------------------------------------------------
+        # -------  AUX HEADS (use highest‑res FPN map ‘0’) ----------------
+        fmap = features["0"]
+        center_logits   = self.center_head(fmap)      # (B,1,h,w)
+        boundary_logits = self.boundary_head(fmap)    # (B,1,h,w)
+
+        # 3) main MaskRCNN forward ----------------------------------------
+        detections, detector_losses = \
+            self.roi_heads(features, images.image_sizes, targets)
+        detections = self.transform.postprocess(detections,
+                                                images.image_sizes,
+                                                [t["orig_size"] for t in targets]
+                                                if self.training else images.image_sizes)
+
+        # 4) attach logits to predictions (in eval mode only)
+        if not self.training:
+            for d, c, b in zip(detections,
+                               center_logits.sigmoid(),   # (1,h,w)
+                               boundary_logits.sigmoid()):
+                d["center_logits"]   = c.squeeze(0)
+                d["boundary_logits"] = b.squeeze(0)
+            return detections
+
+        # 5) -------  AUXILIARY LOSSES -----------------------------------
+        aux_losses = {}
+        pos_w = self._pos_w.to(center_logits.device) if self._pos_w is not None else None
+        for name, logits in [("center",   center_logits),
+                             ("boundary", boundary_logits)]:
+            # up‑/down‑sample gt to match logits size
+            gts = torch.stack([t[f"{name}_map"] for t in targets])  # (B,1,H,W)
+            gts = F.interpolate(gts.float(), size=logits.shape[-2:],
+                                mode="nearest")                     # keep binary
+            loss = F.binary_cross_entropy_with_logits(
+                logits, gts, pos_weight=pos_w)
+            aux_losses[f"loss_{name}"] = self._aux_w * loss
+
+        total_losses = {}
+        total_losses.update(detector_losses)
+        total_losses.update(aux_losses)
+        return total_losses
+
+
+def get_model(num_classes: int,
+              model_type: str = "resnet50",
+              with_train_map: bool = False,
+              aux_loss_weight: float = 1.0):
+
     if model_type == "resnet50":
         weights = MaskRCNN_ResNet50_FPN_Weights.DEFAULT
-        model = maskrcnn_resnet50_fpn(weights=weights, progress=True)
+        base = maskrcnn_resnet50_fpn(weights=weights)
     elif model_type == "resnet50_v2":
         weights = MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-        model = maskrcnn_resnet50_fpn_v2(weights=weights, progress=True)
+        base = maskrcnn_resnet50_fpn_v2(weights=weights)
     else:
-        raise ValueError(
-            f"Unknown model_type '{model_type}', expected 'resnet50' or 'resnet50_v2'"
-        )
+        raise ValueError("…")
 
-    # 2. 取出原本 ROI heads 的輸入通道
-    in_features_box  = model.roi_heads.box_predictor.cls_score.in_features
-    in_channels_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
+    # replace heads to fit your class count
+    in_feats = base.roi_heads.box_predictor.cls_score.in_features
+    base.roi_heads.box_predictor = FastRCNNPredictor(in_feats, num_classes)
 
-    # 3. 替換 Box predictor (分類 + bbox regression)
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_features_box, num_classes)
+    in_ch = base.roi_heads.mask_predictor.conv5_mask.in_channels
+    base.roi_heads.mask_predictor = MaskRCNNPredictor(in_ch, 256, num_classes)
 
-    # 4. 替換 Mask predictor
-    hidden_dim = 256  # MaskRCNN 預設 hidden dim
-    model.roi_heads.mask_predictor = MaskRCNNPredictor(
-        in_channels_mask, hidden_dim, num_classes
-    )
+    if not with_train_map:
+        return base                          # vanilla MaskRCNN
 
-    if with_train_map:
-        # 假設我們使用的是 mask feature 的輸出通道
-        # 可以替換成其他 feature，如 model.backbone.out_channels
-        model.center_head = ExtraHead(in_channels_mask, 1, name="center")       # binary output
-        model.boundary_head = ExtraHead(in_channels_mask, 1, name="boundary")   # binary output
-
+    # ⇣ wrap with the auxiliary‑head class
+    model = MaskRCNNWithMaps(base_model=base,
+                             loss_weight=aux_loss_weight)
     return model

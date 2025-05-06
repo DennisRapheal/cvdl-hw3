@@ -31,7 +31,7 @@ def get_args():
     p.add_argument('--epochs', type=int, default=40)
     p.add_argument('--batch_size', type=int, default=4)
     p.add_argument('--lr', type=float, default=1e-4)
-    p.add_argument('--with_train_map', type=bool, default=False)
+    p.add_argument('--with_train_map', action='store_true')
     p.add_argument('--data_root', type=str, default='data/train')
     p.add_argument('--save_dir', type=str, default='checkpoints')
     return p.parse_args()
@@ -42,7 +42,7 @@ def get_args():
 # Epoch loops
 # -------------------------
 
-def train_one_epoch(model, loader, optim, device, with_train_map=False):
+def train_one_epoch(model, loader, optim, device):
     model.train()
     metric = MeanAveragePrecision(iou_type="bbox")  # 先用 bbox mAP 作 proxy
 
@@ -52,11 +52,7 @@ def train_one_epoch(model, loader, optim, device, with_train_map=False):
         images = list(img.to(device) for img in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        loss_dict = model(images, targets)
-
-        # ➕ 如果模型輸出包含 center / boundary maps，額外加入 loss
-
-        loss = sum(loss_dict.values())
+        loss = sum(model(images, targets).values())
         epoch_loss += loss.item()
 
         optim.zero_grad()
@@ -119,7 +115,9 @@ if __name__ == '__main__':
     val_loader = get_val_loader(batch_size=args.batch_size, root=args.data_root)
 
     # Model
-    model = get_model(num_classes=5, model_type=args.model_type)
+    model = get_model(num_classes=5,
+                    model_type=args.model_type,
+                    with_train_map=args.with_train_map)
     if args.pretrained_pth != '':
         model.load_state_dict(torch.load(args.pretrained_pth, map_location=device))
 

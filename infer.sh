@@ -8,10 +8,10 @@
 #   --mask_threshold 0.3
 
 
-CUDA_VISIBLE_DEVICES=3 python inference.py \
+CUDA_VISIBLE_DEVICES=1 python inference.py \
   --img_dir ./data/test_release \
-  --model_type resnet50 \
-  --model_path ./checkpoints/v1_b2_elastic_maskrcnn.pth \
+  --model_type resnet50_v2 \
+  --model_path ./checkpoints/v2_b2_elastic_maskrcnn.pth \
   --batch_size 2 \
   --output_dir ./result \
   --threshold 0.0 \
