@@ -11,7 +11,7 @@
 CUDA_VISIBLE_DEVICES=3 python inference.py \
   --img_dir ./data/test_release \
   --model_type resnet50 \
-  --model_path ./checkpoints/v1_b1_elastic_maskrcnn.pth \
+  --model_path ./checkpoints/v1_b2_elastic_maskrcnn.pth \
   --batch_size 2 \
   --output_dir ./result \
   --threshold 0.0 \
