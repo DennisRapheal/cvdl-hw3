@@ -14,8 +14,8 @@ CUDA_VISIBLE_DEVICES=1 python inference.py \
   --model_path ./checkpoints/v2_b2_elastic_maskrcnn.pth \
   --batch_size 2 \
   --output_dir ./result \
-  --threshold 0.0 \
-  --mask_threshold 0.5
+  --threshold 0.1 \
+  --mask_threshold 0.6
 
 python inference.py \
   --img_dir ./sample-image \
