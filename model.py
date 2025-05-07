@@ -67,7 +67,7 @@ def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bo
         model.boundary_head = ExtraHead(in_channels_mask, 1, name="boundary")   # binary output
 
     if customed_anchor:
-        anchor_sizes=((16,), (23,), (29,), (40,), (64,))   # ← 可外部指定
+        anchor_sizes=((16,), (28,), (48,), (64,), (156,))   # ← 可外部指定
         aspect_ratios=((0.5, 1.0, 2.0),) * 5
         model.rpn.anchor_generator = AnchorGenerator(
             sizes=anchor_sizes,
