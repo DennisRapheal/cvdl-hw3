@@ -26,3 +26,5 @@ python train.py --model_name v2_b4_elastic --model_type resnet50_v2 --pretrained
 CUDA_VISIBLE_DEVICES=1 python train.py --model_name v2_b2_preaux --model_type resnet50_v2 --epochs 30 --batch_size 2 && CUDA_VISIBLE_DEVICES=1 python train.py --model_name v2_b2_aux --with_train_map --model_type resnet50_v2 --epochs 80 --batch_size 2 --pretrained_pth /home/ccwang/dennis/dennislin0906/cvdl-hw3/checkpoints/v2_b2_preaux_maskrcnn.pth
 
 CUDA_VISIBLE_DEVICES=3 python train.py --model_name v2_b2_pure_aux --with_train_map --model_type resnet50_v2 --epochs 80 --batch_size 2
+
+CUDA_VISIBLE_DEVICES=3 python train.py --model_name v2_b2_customed_anchor --customed_anchor --model_type resnet50_v2 --epochs 50 --batch_size 4

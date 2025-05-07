@@ -35,6 +35,7 @@ def get_args():
     p.add_argument('--batch_size', type=int, default=4)
     p.add_argument('--lr', type=float, default=1e-4)
     p.add_argument('--with_train_map', action='store_true')
+    p.add_argument('--customed_anchor', action='store_true')
     p.add_argument('--data_root', type=str, default='data/train')
     p.add_argument('--save_dir', type=str, default='checkpoints')
     return p.parse_args()
@@ -164,7 +165,8 @@ if __name__ == '__main__':
     # Model
     model = get_model(num_classes=5,
                     model_type=args.model_type,
-                    with_train_map=args.with_train_map)
+                    with_train_map=args.with_train_map,
+                    customed_anchor=args.customed_anchor)
     if args.pretrained_pth != '':
         model.load_state_dict(torch.load(args.pretrained_pth, map_location=device))
 

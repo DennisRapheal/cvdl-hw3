@@ -8,6 +8,7 @@ from torchvision.models.detection import (
 )
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn   import MaskRCNNPredictor
+from torchvision.models.detection.rpn import AnchorGenerator
 
 class ExtraHead(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, name: str):
@@ -23,7 +24,7 @@ class ExtraHead(nn.Module):
         return self.head(x)
 
 
-def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bool = False):
+def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bool = False, customed_anchor: bool= False):
     """
     建立 Mask R‑CNN 模型並替換 heads 以符合自訂類別數。
 
@@ -64,5 +65,13 @@ def get_model(num_classes: int, model_type: str = "resnet50", with_train_map: bo
         # 可以替換成其他 feature，如 model.backbone.out_channels
         model.center_head = ExtraHead(in_channels_mask, 1, name="center")       # binary output
         model.boundary_head = ExtraHead(in_channels_mask, 1, name="boundary")   # binary output
+
+    if customed_anchor:
+        anchor_sizes=((16,), (19,), (23,), (29,), (37,))   # ← 可外部指定
+        aspect_ratios=((0.5, 1.0, 2.0),) * 5
+        model.rpn.anchor_generator = AnchorGenerator(
+            sizes=anchor_sizes,
+            aspect_ratios=aspect_ratios
+        )
 
     return model
