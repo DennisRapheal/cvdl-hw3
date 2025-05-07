@@ -7,9 +7,9 @@ from pathlib import Path
 import skimage.io as sio
 
 # ==== 設定路徑與目標 ====
-pred_json_path = "./sample-image_result/pred.json"
-test_img_dir = Path("./sample-image")
-test_cls_dir = Path("./sample-image-cls")
+pred_json_path = "./../sample-image_result/pred.json"
+test_img_dir = Path("./../sample-image")
+test_cls_dir = Path("./../sample-image-cls")
 target_id = 3
 
 # ==== 類別顏色對應表（category_id → RGB） ====

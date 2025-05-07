@@ -48,7 +48,11 @@ def get_train_transform() -> A.Compose:
         A.Normalize(mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
-    ])
+    ],
+    additional_targets={
+        'center_map': 'mask',
+        'boundary_map': 'mask'
+    })
 
 
 def get_val_transform() -> A.Compose:
@@ -102,8 +106,9 @@ class CellDataset(Dataset):
 
         # === 加載 center / boundary maps ===
         map_folder = Path("./data/train_maps")
-        center_map = np.load(map_folder / f"{folder.name}_center_heat_map.npy")
-        boundary_map = np.load(map_folder / f"{folder.name}_boundary_map.npy")
+        center_map = np.load(map_folder / f"{folder.name}_center_heat_map.npy")[None]
+        boundary_map = np.load(map_folder / f"{folder.name}_boundary_map.npy")[None]
+        # _map.shape = (1, H, W)
 
         # --- 3. 若沒有任何物件，補上空 target（模型不會爆） ---
         if len(masks) == 0:
@@ -119,9 +124,17 @@ class CellDataset(Dataset):
             masks_np = [np.array(m, dtype=np.uint8) for m in masks]
 
             if self.transform is not None:
-                augmented = self.transform(image=img, masks=masks_np)
+                augmented = self.transform(
+                    image=img,
+                    masks=masks_np,
+                    center_map=center_map[0],
+                    boundary_map=boundary_map[0]
+                )
+
                 img = augmented["image"]
                 masks = augmented["masks"]
+                center_map   = augmented["center_map"][None]
+                boundary_map = augmented["boundary_map"][None]
             else:
                 img = torch.tensor(img).permute(2, 0, 1).float() / 255.0
 
@@ -129,15 +142,17 @@ class CellDataset(Dataset):
             labels = torch.as_tensor(labels, dtype=torch.int64)
             masks = torch.as_tensor(np.stack(masks), dtype=torch.uint8)
 
+        center_map   = torch.as_tensor(center_map,   dtype=torch.float32)  # (1, h, w)
+        boundary_map = torch.as_tensor(boundary_map, dtype=torch.float32)  # (1, h, w)
+
         target = {
             "boxes": boxes,
             "labels": labels,
             "masks": masks,
             "image_id": torch.tensor([idx]),
-            "center_map": torch.tensor(center_map, dtype=torch.float32),
-            "boundary_map": torch.tensor(boundary_map, dtype=torch.float32),
+            "center_map": center_map,
+            "boundary_map": boundary_map,
         }
-
 
         return img, target
 
@@ -154,6 +169,7 @@ class TestDataset(Dataset):
             mapping = {item["file_name"]: item["id"] for item in json.load(f)}
         self.image_id_map = mapping
         self.transform = transform or get_val_transform()
+
     def __len__(self) -> int:
         return len(self.images)
 
@@ -161,8 +177,8 @@ class TestDataset(Dataset):
         img_path = self.images[idx]
         img = np.array(Image.open(img_path).convert("RGB"))
         if self.transform:
-            img = self.transform(image=img)["image"]      # Tensor [C,H,W]
-        img_id = self.image_id_map[img_path.name]         # 👉 純 int
+            img = self.transform(image=img)["image"]
+        img_id = self.image_id_map[img_path.name]
         return img, img_id
 
 

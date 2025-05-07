@@ -11,6 +11,7 @@ import pandas as pd
 
 import torch
 from torch.optim import AdamW
+import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import torch.nn.functional as F
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
@@ -29,6 +30,8 @@ def get_args():
                    choices=['resnet50', 'resnet50_v2'])
     p.add_argument('--pretrained_pth', type=str, default='')
     p.add_argument('--epochs', type=int, default=40)
+    p.add_argument('--w_center', type=float, default=0.5)
+    p.add_argument('--w_boundary', type=float, default=0.5)
     p.add_argument('--batch_size', type=int, default=4)
     p.add_argument('--lr', type=float, default=1e-4)
     p.add_argument('--with_train_map', action='store_true')
@@ -42,7 +45,7 @@ def get_args():
 # Epoch loops
 # -------------------------
 
-def train_one_epoch(model, loader, optim, device):
+def train_one_epoch(model, loader, optim, device, w_center, w_boundary):
     model.train()
     metric = MeanAveragePrecision(iou_type="bbox")  # 先用 bbox mAP 作 proxy
 
@@ -52,7 +55,51 @@ def train_one_epoch(model, loader, optim, device):
         images = list(img.to(device) for img in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        loss = sum(model(images, targets).values())
+        # 1. 前向傳遞獲得 base 損失
+        losses = model(images, targets)
+        loss = sum(losses.values())
+        
+        # 2. 額外加入 center & boundary loss
+        if hasattr(model, 'center_head') and hasattr(model, 'boundary_head'):
+            features = model.backbone(images[0].unsqueeze(0).to(device) if isinstance(images, list) else images)
+            if isinstance(features, dict):
+                features = list(features.values())[0]
+
+            bce = nn.BCEWithLogitsLoss()
+            center_loss = 0.0
+            boundary_loss = 0.0
+
+            for i in range(len(images)):
+                img = images[i].unsqueeze(0)  # shape: (1, 3, H, W)
+                features = model.backbone(img)
+                if isinstance(features, dict):
+                    features = list(features.values())[0]
+
+                center_pred = model.center_head(features)[0, 0]
+                boundary_pred = model.boundary_head(features)[0, 0]
+
+                target_center = targets[i]['center_map'].to(device)
+                target_boundary = targets[i]['boundary_map'].to(device)
+
+                h_pred, w_pred = center_pred.shape
+
+                target_center_resized = F.interpolate(
+                    target_center.unsqueeze(0), size=(h_pred, w_pred),
+                    mode='bilinear', align_corners=False
+                )[0, 0]
+
+                target_boundary_resized = F.interpolate(
+                    target_boundary.unsqueeze(0), size=(h_pred, w_pred),
+                    mode='nearest'
+                )[0, 0]
+
+                center_loss += bce(center_pred, target_center_resized)
+                boundary_loss += bce(boundary_pred, target_boundary_resized)
+
+
+            loss += (w_center * center_loss) + (w_boundary * boundary_loss)
+
+
         epoch_loss += loss.item()
 
         optim.zero_grad()
@@ -136,7 +183,7 @@ if __name__ == '__main__':
     for epoch in range(args.epochs):
         start = time.time()
         train_loss, train_map, train_map50 = train_one_epoch(
-            model, train_loader, optimiser, device)
+            model, train_loader, optimiser, device, args.w_center, args.w_boundary)
         val_map, val_map50 = validate(model, val_loader, device)
         scheduler.step()
         epoch_time = time.time() - start

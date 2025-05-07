@@ -9,8 +9,8 @@ import json
 # ==== 設定 ====
 image_id = 3
 image_file = "acaf16a8-d1e6-4746-92ae-c76fa82cb70d.tif"
-image_dir = Path("./sample-image")
-cls_dir =  Path("./sample-image-cls")
+image_dir = Path("./../sample-image")
+cls_dir =  Path("./../sample-image-cls")
 
 class_ids = [1, 2, 3, 4]  # class1.tif ~ class4.tif
 gt_json_path = "gt.json"

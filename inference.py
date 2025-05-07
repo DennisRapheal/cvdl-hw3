@@ -19,6 +19,7 @@ def parse_args():
                         help='Path to the trained model .pth file')
     parser.add_argument('--batch_size', type=int, default=8,
                         help='Batch size for inference')
+    parser.add_argument('--with_train_map', action='store_true')
     parser.add_argument('--output_dir', type=str, default='./result',
                         help='Directory to save pred.json and pred.zip')
     parser.add_argument('--threshold', type=float, default=0.5,
@@ -41,7 +42,11 @@ def main():
     device = torch.device(args.device)
 
     # Load the model architecture and weights
-    model = get_model(num_classes=args.num_classes, model_type=args.model_type)
+    model = get_model(
+        num_classes=args.num_classes,
+        model_type=args.model_type,
+        with_train_map=args.with_train_map
+    )
     model.load_state_dict(torch.load(args.model_path, map_location=device))
     model.to(device).eval()
 
