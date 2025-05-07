@@ -68,17 +68,12 @@ for p in img_preds:
         )
 
 # ==== 顯示兩張圖 ====
-plt.figure(figsize=(14, 6))
+gt_save_path = f"gt_overlay_{target_id}.png"
+pred_save_path = f"pred_overlay_{target_id}.png"
 
-plt.subplot(1, 2, 1)
-plt.imshow(gt_overlay.astype(np.uint8))
-plt.title("Ground Truth Overlay")
-plt.axis("off")
+Image.fromarray(gt_overlay.astype(np.uint8)).save(gt_save_path)
+Image.fromarray(pred_overlay.astype(np.uint8)).save(pred_save_path)
 
-plt.subplot(1, 2, 2)
-plt.imshow(pred_overlay.astype(np.uint8))
-plt.title("Prediction Overlay")
-plt.axis("off")
+print(f"Saved ground truth overlay to {gt_save_path}")
+print(f"Saved prediction overlay to {pred_save_path}")
 
-plt.tight_layout()
-plt.show()

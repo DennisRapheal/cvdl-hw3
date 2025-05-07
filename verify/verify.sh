@@ -2,9 +2,9 @@ cd ..
 # choose a model you want to visualize
 python inference.py \
   --img_dir ./sample-image \
-  --model_type resnet50 \
-  --model_path ./checkpoints/v1_b4_maskrcnn.pth \
-  --batch_size 1 \
+  --model_type resnet50_v2 \
+  --model_path ./checkpoints/v2_b2_elastic_maskrcnn.pth \
+  --batch_size 2 \
   --output_dir ./sample-image_result \
   --threshold 0.0 \
   --mask_threshold 0.5

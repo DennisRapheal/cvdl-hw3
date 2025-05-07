@@ -11,12 +11,11 @@
 CUDA_VISIBLE_DEVICES=1 python inference.py \
   --img_dir ./data/test_release \
   --model_type resnet50_v2 \
-  --model_path ./checkpoints/v2_b2_pure_aux_maskrcnn.pth \
-  --batch_size 2 \
+  --model_path ./checkpoints/v2_b4_customed_anchor_maskrcnn.pth \
+  --batch_size 4 \
   --output_dir ./result \
   --threshold 0.1 \
   --mask_threshold 0.6 \
-  --with_train_map
 
 python inference.py \
   --img_dir ./sample-image \
